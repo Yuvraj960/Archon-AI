@@ -1,0 +1,236 @@
+const Project = require('../models/Project');
+const Design  = require('../models/Design');
+
+// ─── Ownership guard ──────────────────────────────────────────────────────────
+const owned = async (id, userId, res) => {
+  const project = await Project.findById(id);
+  if (!project) {
+    res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Project not found' } });
+    return null;
+  }
+  if (String(project.userId) !== String(userId)) {
+    res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Access denied' } });
+    return null;
+  }
+  return project;
+};
+
+// ─── Markdown builder ─────────────────────────────────────────────────────────
+
+/**
+ * Convert a Design document + project metadata into a rich Markdown string.
+ */
+function buildMarkdown(project, design) {
+  const ts  = new Date(design.createdAt).toUTCString();
+  const ver = design.version;
+
+  const lines = [];
+
+  // ── Title block ────────────────────────────────────────────────────────────
+  lines.push(`# ${project.title} — Architecture Design (v${ver})`);
+  lines.push('');
+  if (project.description) {
+    lines.push(`> ${project.description}`);
+    lines.push('');
+  }
+  lines.push(`**Generated:** ${ts}  `);
+  lines.push(`**Status:** ${project.status}  `);
+  lines.push(`**Design Version:** ${ver}`);
+  lines.push('');
+  lines.push('---');
+  lines.push('');
+
+  // ── Functional Requirements ────────────────────────────────────────────────
+  lines.push('## 1. Functional Requirements');
+  lines.push('');
+  const functional = design.requirements?.functional || [];
+  if (functional.length) {
+    functional.forEach((r, i) => lines.push(`${i + 1}. ${r}`));
+  } else {
+    lines.push('_No functional requirements specified._');
+  }
+  lines.push('');
+
+  // ── Non-Functional Requirements ────────────────────────────────────────────
+  lines.push('## 2. Non-Functional Requirements');
+  lines.push('');
+  const nonFunctional = design.requirements?.nonFunctional || [];
+  if (nonFunctional.length) {
+    nonFunctional.forEach((r, i) => lines.push(`${i + 1}. ${r}`));
+  } else {
+    lines.push('_No non-functional requirements specified._');
+  }
+  lines.push('');
+
+  // ── Architecture ───────────────────────────────────────────────────────────
+  lines.push('## 3. Architecture');
+  lines.push('');
+  const arch = design.architecture || {};
+  if (arch.pattern)   lines.push(`**Pattern:** ${arch.pattern}`);
+  if (arch.rationale) lines.push(`**Rationale:** ${arch.rationale}`);
+  lines.push('');
+
+  if (arch.techStack) {
+    lines.push('### Tech Stack');
+    lines.push('');
+    lines.push('| Layer | Technology |');
+    lines.push('|-------|-----------|');
+    Object.entries(arch.techStack).forEach(([layer, tech]) => {
+      if (tech) lines.push(`| ${capitalise(layer)} | ${tech} |`);
+    });
+    lines.push('');
+  }
+
+  if (arch.components?.length) {
+    lines.push('### Components');
+    lines.push('');
+    arch.components.forEach((c) => lines.push(`- ${c}`));
+    lines.push('');
+  }
+
+  // ── API Design ─────────────────────────────────────────────────────────────
+  lines.push('## 4. API Design');
+  lines.push('');
+  const apis = design.apis || [];
+  if (apis.length) {
+    apis.forEach((ep) => {
+      lines.push(`### \`${ep.method} ${ep.path}\``);
+      if (ep.description) lines.push(`${ep.description}`);
+      lines.push('');
+      if (ep.requestBody && Object.keys(ep.requestBody).length) {
+        lines.push('**Request Body:**');
+        lines.push('```json');
+        lines.push(JSON.stringify(ep.requestBody, null, 2));
+        lines.push('```');
+        lines.push('');
+      }
+      if (ep.response && Object.keys(ep.response).length) {
+        lines.push('**Response:**');
+        lines.push('```json');
+        lines.push(JSON.stringify(ep.response, null, 2));
+        lines.push('```');
+        lines.push('');
+      }
+    });
+  } else {
+    lines.push('_No API endpoints specified._');
+    lines.push('');
+  }
+
+  // ── Database Schema ────────────────────────────────────────────────────────
+  lines.push('## 5. Database Schema');
+  lines.push('');
+  const collections = design.dbSchema || [];
+  if (collections.length) {
+    collections.forEach((col) => {
+      lines.push(`### Collection: \`${col.name}\``);
+      lines.push('');
+      lines.push('| Field | Type | Required | Notes |');
+      lines.push('|-------|------|----------|-------|');
+      (col.fields || []).forEach((f) => {
+        lines.push(`| ${f.name} | ${f.type} | ${f.required ? '✓' : ''} | ${f.notes || ''} |`);
+      });
+      lines.push('');
+    });
+  } else {
+    lines.push('_No database schema specified._');
+    lines.push('');
+  }
+
+  // ── Mermaid Diagram ────────────────────────────────────────────────────────
+  if (design.diagram) {
+    lines.push('## 6. Architecture Diagram');
+    lines.push('');
+    lines.push('```mermaid');
+    lines.push(design.diagram);
+    lines.push('```');
+    lines.push('');
+  }
+
+  lines.push('---');
+  lines.push('');
+  lines.push('_Generated by Archon AI_');
+
+  return lines.join('\n');
+}
+
+// ─── JSON builder ─────────────────────────────────────────────────────────────
+
+/**
+ * Build a clean, portable JSON export — strips Mongoose internals.
+ */
+function buildJSON(project, design) {
+  return {
+    exportedAt: new Date().toISOString(),
+    exportVersion: '1.0',
+    project: {
+      id:          project._id,
+      title:       project.title,
+      description: project.description,
+      status:      project.status,
+      createdAt:   project.createdAt,
+      updatedAt:   project.updatedAt,
+    },
+    design: {
+      id:             design._id,
+      version:        design.version,
+      createdAt:      design.createdAt,
+      requirements:   design.requirements,
+      architecture:   design.architecture,
+      apis:           design.apis,
+      dbSchema:       design.dbSchema,
+      diagram:        design.diagram,
+    },
+  };
+}
+
+// ─── Utility ──────────────────────────────────────────────────────────────────
+const capitalise = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+// ─── Route handlers ───────────────────────────────────────────────────────────
+
+/**
+ * GET /api/v1/projects/:id/export?format=json|md&version=<n>
+ *
+ * Query params:
+ *   format  — "json" (default) | "md"
+ *   version — design version number (defaults to latest)
+ */
+exports.exportDesign = async (req, res, next) => {
+  try {
+    const project = await owned(req.params.id, req.user._id, res);
+    if (!project) return;
+
+    // Resolve which design version to export
+    let design;
+    if (req.query.version) {
+      design = await Design.findOne({ projectId: project._id, version: Number(req.query.version) });
+      if (!design)
+        return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: `Version ${req.query.version} not found` } });
+    } else {
+      design = project.latestDesignId
+        ? await Design.findById(project.latestDesignId)
+        : null;
+      if (!design)
+        return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'No design available for this project yet' } });
+    }
+
+    const format   = (req.query.format || 'json').toLowerCase();
+    const safeName = project.title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    const fileName = `${safeName}_v${design.version}`;
+
+    if (format === 'md') {
+      const content = buildMarkdown(project, design);
+      res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}.md"`);
+      return res.send(content);
+    }
+
+    // Default: JSON
+    const content = buildJSON(project, design);
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="${fileName}.json"`);
+    return res.json(content);
+
+  } catch (err) { next(err); }
+};
