@@ -1,7 +1,11 @@
+const fs           = require('fs');
+const path         = require('path');
 const express      = require('express');
 const cors         = require('cors');
 const helmet       = require('helmet');
 const morgan       = require('morgan');
+const yaml         = require('js-yaml');
+const swaggerUi    = require('swagger-ui-express');
 const errorHandler = require('./middleware/errorHandler');
 
 const authRoutes    = require('./routes/auth.routes');
@@ -17,6 +21,12 @@ app.use(morgan('dev'));
 
 // ─── Body parsing ─────────────────────────────────────────────────────────────
 app.use(express.json());
+
+// ─── OpenAPI / Swagger docs ───────────────────────────────────────────────────
+const openapiPath = path.join(__dirname, '..', 'openapi.yaml');
+const swaggerDocument = yaml.load(fs.readFileSync(openapiPath, 'utf8'));
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+app.get('/api-docs.json', (req, res) => res.json(swaggerDocument));
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 app.use('/api/v1/auth',     authRoutes);
