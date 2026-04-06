@@ -3,12 +3,15 @@
   "version": "1.0.0",
   "description": "Archon AI backend — Node.js + Express + MongoDB",
   "main": "server.js",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js"
   },
   "keywords": [],
-  "author": "",
+  "author": "Yuvraj Gupta",
   "license": "ISC",
   "dependencies": {
     "@google/generative-ai": "^0.24.1",

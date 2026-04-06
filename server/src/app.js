@@ -16,7 +16,24 @@ const app = express();
 
 // ─── Security & logging ───────────────────────────────────────────────────────
 app.use(helmet());
-app.use(cors({ origin: process.env.CLIENT_URL, credentials: true }));
+
+// For Local Development
+// app.use(cors({ origin: process.env.CLIENT_URL, credentials: true }));
+
+// For Production (allow all origins, but can be restricted as needed)
+const allowedOrigins = [
+  process.env.CLIENT_URL,
+  'http://localhost:5173', // keep for local dev
+].filter(Boolean);
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    callback(new Error('Not allowed by CORS'));
+  },
+  credentials: true,
+}));
+
 app.use(morgan('dev'));
 
 // ─── Body parsing ─────────────────────────────────────────────────────────────
