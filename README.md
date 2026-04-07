@@ -3,6 +3,12 @@
   <p><strong>AI-Powered System Architecture & Design Generator</strong></p>
 </div>
 
+<div align="center">
+  <a href="https://archonaidev.vercel.app/" target="_blank" rel="noopener noreferrer">
+    <strong style="font-size: 20px;">Live Demo🔗</strong>
+  </a>
+</div>
+
 ---
 
 ## 📖 Overview
@@ -40,6 +46,12 @@ With features like real-time visual previews, version control, and instant forma
 - **Security**: JWT Authentication, `bcryptjs`, and Helmet
 
 ---
+
+## Deployment
+
+### Frontend is deployed on Vercel, and can be accessed via the [Link🔗](https://archonaidev.vercel.app/).
+
+### Backend API is deployed on Render, and can be accessed via the [Link🔗](https://archon-ai-1g1l.onrender.com).
 
 ## 🚀 Getting Started
 
