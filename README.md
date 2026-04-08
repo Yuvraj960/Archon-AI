@@ -127,6 +127,50 @@ npm run dev
 ```
 *The frontend will run on `http://localhost:5173`. Open your browser and navigate here to access the app.*
 
+### 4. Run With Docker
+
+If you want to run the app with Docker using just two app services, use the root `docker-compose.yml`.
+
+**Before starting:**
+- Make sure `server/.env` exists.
+- If your MongoDB runs on your machine, set `MONGO_URI` to use `host.docker.internal` instead of `localhost`.
+- If your Ollama server runs on your machine, set `OLLAMA_URL=http://host.docker.internal:11434`.
+- `client/.env` should point to the backend API:
+
+```env
+VITE_API_URL=http://localhost:5000/api/v1
+```
+
+**Example `server/.env` values for Docker Desktop:**
+```env
+PORT=5000
+MONGO_URI=mongodb://host.docker.internal:27017/archonai
+JWT_SECRET=your_super_secret_jwt_key
+JWT_REFRESH_SECRET=your_super_secret_refresh_key
+JWT_EXPIRES_IN=15m
+JWT_REFRESH_EXPIRES_IN=7d
+AI_PROVIDER=gemini
+GOOGLE_AI_API_KEY=your_gemini_api_key
+OLLAMA_URL=http://host.docker.internal:11434
+OLLAMA_MODEL=qwen3.5:9b
+NODE_ENV=development
+CLIENT_URL=http://localhost:5173
+```
+
+**Start both services:**
+```bash
+docker compose up --build
+```
+
+This will start:
+- Backend on `http://localhost:5000`
+- Frontend on `http://localhost:5173`
+
+**Stop the containers:**
+```bash
+docker compose down
+```
+
 ---
 
 ## 📁 Project Structure
